@@ -3,6 +3,7 @@ import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
 import { processFile } from '@/lib/processor';
+import { getChatById } from '@/lib/db/queries';
 
 // Max upload file size in bytes
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -45,16 +46,22 @@ export async function POST(request: Request) {
     );
   }
 
-  // 4) Read file into buffer
+  // 4) Verify chat exists
+  const chat = await getChatById({ id: chatId });
+  if (!chat) {
+    return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+  }
+
+  // 5) Read file into buffer
   const rawBuffer = await file.arrayBuffer();
 
   try {
-    // 5) Upload raw file to Vercel Blob storage
+    // 6) Upload raw file to Vercel Blob storage
     const { url: fileUrl } = await put(file.name, rawBuffer, {
       access: 'public',
     });
 
-    // 6) Process file: chunking, embedding, DB storage
+    // 7) Process file: chunking, embedding, DB storage
     const result = await processFile({
       chatId,
       fileName: file.name,
@@ -63,7 +70,7 @@ export async function POST(request: Request) {
       rawBuffer,
     });
 
-    // 7) Return processing summary
+    // 8) Return processing summary
     return NextResponse.json(result);
   } catch (error) {
     console.error('Upload or processing error:', error);
