@@ -27,6 +27,7 @@ import {
   type DBMessage,
   type Chat,
   stream,
+  fileEmbedding,
 } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
 import { generateUUID } from '../utils';
@@ -533,6 +534,41 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
     throw new ChatSDKError(
       'bad_request:database',
       'Failed to get stream ids by chat id',
+    );
+  }
+}
+
+export async function saveFileEmbedding({
+  chatId,
+  fileName,
+  fileUrl,
+  fileType,
+  content,
+  embedding,
+  createdAt,
+}: {
+  chatId: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  content: string;
+  embedding: number[];
+  createdAt: Date;
+}) {
+  try {
+    return await db.insert(fileEmbedding).values({
+      chatId,
+      fileName,
+      fileUrl,
+      fileType,
+      content,
+      embedding,
+      createdAt,
+    });
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to save file embedding',
     );
   }
 }

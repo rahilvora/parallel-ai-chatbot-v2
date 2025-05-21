@@ -9,6 +9,7 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  vector,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -168,3 +169,18 @@ export const stream = pgTable(
 );
 
 export type Stream = InferSelectModel<typeof stream>;
+
+export const fileEmbedding = pgTable('FileEmbedding', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  chatId: uuid('chatId')
+    .notNull()
+    .references(() => chat.id),
+  fileName: text('fileName').notNull(),
+  fileUrl: text('fileUrl').notNull(),
+  fileType: varchar('fileType').notNull(),
+  content: text('content').notNull(),
+  embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+});
+
+export type FileEmbedding = InferSelectModel<typeof fileEmbedding>;
