@@ -16,6 +16,7 @@ import {
   getStreamIdsByChatId,
   saveChat,
   saveMessages,
+  getFileEmbeddingsByChatId,
 } from '@/lib/db/queries';
 import { generateUUID, getTrailingMessageId } from '@/lib/utils';
 import { generateTitleFromUserMessage } from '../../actions';
@@ -112,6 +113,18 @@ export async function POST(request: Request) {
     }
 
     const previousMessages = await getMessagesByChatId({ id });
+    const fileEmbeddings = await getFileEmbeddingsByChatId({ chatId: id });
+
+    // Add file context to the system prompt if there are file embeddings
+    const fileContext =
+      fileEmbeddings.length > 0
+        ? `\n\nContext from uploaded files:\n${fileEmbeddings
+            .map(
+              (embedding) =>
+                `File: ${embedding.fileName}\nContent: ${embedding.content}\n`,
+            )
+            .join('\n')}`
+        : '';
 
     const messages = appendClientMessage({
       // @ts-expect-error: todo add type conversion from DBMessage[] to UIMessage[]
@@ -148,7 +161,8 @@ export async function POST(request: Request) {
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel, requestHints }),
+          system:
+            systemPrompt({ selectedChatModel, requestHints }) + fileContext,
           messages,
           maxSteps: 5,
           experimental_activeTools:

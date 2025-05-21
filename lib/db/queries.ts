@@ -572,3 +572,20 @@ export async function saveFileEmbedding({
     );
   }
 }
+
+export async function getFileEmbeddingsByChatId({
+  chatId,
+}: { chatId: string }) {
+  try {
+    return await db
+      .select()
+      .from(fileEmbedding)
+      .where(eq(fileEmbedding.chatId, chatId))
+      .orderBy(asc(fileEmbedding.createdAt));
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to get file embeddings by chat id',
+    );
+  }
+}
