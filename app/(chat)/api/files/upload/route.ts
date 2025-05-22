@@ -11,18 +11,18 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['text/plain', 'text/csv'] as const;
 
 export async function POST(request: Request) {
-  // 1) Authenticate user session
+  // 1️ Authenticate user session
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 2) Parse multipart form data
+  // 2️ Parse multipart form data
   const formData = await request.formData();
   const file = formData.get('file');
   const chatId = formData.get('chatId');
 
-  // 3) Validate file and chatId
+  // 3️ Validate file and chatId
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
   }
@@ -46,22 +46,22 @@ export async function POST(request: Request) {
     );
   }
 
-  // 4) Verify chat exists
+  // 4️ Verify chat exists
   const chat = await getChatById({ id: chatId });
   if (!chat) {
     return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
   }
 
-  // 5) Read file into buffer
+  // 5️ Read file into buffer
   const rawBuffer = await file.arrayBuffer();
 
   try {
-    // 6) Upload raw file to Vercel Blob storage
+    // 6️ Upload raw file to Vercel Blob storage
     const { url: fileUrl } = await put(file.name, rawBuffer, {
       access: 'public',
     });
 
-    // 7) Process file: chunking, embedding, DB storage
+    // 7️ Process file: chunking, embedding, DB storage
     const result = await processFile({
       chatId,
       fileName: file.name,
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       rawBuffer,
     });
 
-    // 8) Return processing summary
+    // 8️ Return processing summary
     return NextResponse.json(result);
   } catch (error) {
     console.error('Upload or processing error:', error);

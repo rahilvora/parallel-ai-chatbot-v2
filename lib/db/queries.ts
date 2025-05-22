@@ -543,6 +543,9 @@ export async function saveFileEmbedding({
   fileName,
   fileUrl,
   fileType,
+  chunkIndex,
+  rowIndex,
+  colName,
   content,
   embedding,
   createdAt,
@@ -551,6 +554,9 @@ export async function saveFileEmbedding({
   fileName: string;
   fileUrl: string;
   fileType: string;
+  chunkIndex: number;
+  rowIndex: number | null;
+  colName: string | null;
   content: string;
   embedding: number[];
   createdAt: Date;
@@ -561,6 +567,9 @@ export async function saveFileEmbedding({
       fileName,
       fileUrl,
       fileType,
+      chunkIndex,
+      rowIndex,
+      colName,
       content,
       embedding,
       createdAt,
