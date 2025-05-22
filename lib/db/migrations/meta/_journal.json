@@ -57,6 +57,13 @@
       "when": 1747810921858,
       "tag": "0007_great_whistler",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1747880312711,
+      "tag": "0008_broad_ser_duncan",
+      "breakpoints": true
     }
   ]
 }

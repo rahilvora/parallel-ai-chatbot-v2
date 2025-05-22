@@ -10,6 +10,8 @@ import {
   foreignKey,
   boolean,
   vector,
+  integer,
+  index,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -170,17 +172,47 @@ export const stream = pgTable(
 
 export type Stream = InferSelectModel<typeof stream>;
 
+/**
+ * FileEmbedding – stores one semantic chunk (text or CSV row/cell) per row.
+ *
+ * For plain‑text uploads:
+ *   – chunkIndex is 0‑based per file; rowIndex & colName stay null.
+ *
+ * For CSV uploads:
+ *   – rowIndex is the 0‑based CSV row; colName stores the column header when we
+ *     decide to embed each individual cell.  If we embed whole rows, colName is null.
+ *
+ *   This metadata lets us trace retrieved chunks back to their exact position
+ *   in the original attachment, enabling inline highlights and precise citations.
+ */
 export const fileEmbedding = pgTable('FileEmbedding', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
+
   chatId: uuid('chatId')
     .notNull()
-    .references(() => chat.id),
+    .references(() => chat.id, { onDelete: 'cascade' }),
+
   fileName: text('fileName').notNull(),
   fileUrl: text('fileUrl').notNull(),
-  fileType: varchar('fileType').notNull(),
+  fileType: varchar('fileType', { length: 32 }).notNull(),
+
+  // New metadata columns for fine‑grained retrieval
+  chunkIndex: integer('chunkIndex').notNull().default(0), // for .txt chunks
+  rowIndex: integer('rowIndex'), // for CSV rows (nullable)
+  colName: text('colName'), // for CSV cell header (nullable)
+
   content: text('content').notNull(),
   embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+
   createdAt: timestamp('createdAt').notNull().defaultNow(),
 });
-
 export type FileEmbedding = InferSelectModel<typeof fileEmbedding>;
+
+/** TODO: Index for fast `chatId`‑scoped look‑ups
+ * export const idxFileEmbeddingChat = index('idx_fileembedding_chat').on(
+ *   fileEmbedding.chatId,
+ * );
+ *
+ * export const idxFileEmbeddingEmbedding = index('idx_fileembedding_embedding')
+ *   .on(fileEmbedding.embedding);
+ */
