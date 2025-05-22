@@ -35,6 +35,12 @@ function chunkMarkdown(raw: string): Chunk[] {
 }
 
 /* ----- CSV  (row-level for v1) ----- */
+/**
+ * Note: for V1
+ * Row-level: simpler, fewer vectors, good for broad record queries.
+ * Cell-level: precise, ideal for column-specific queries, higher vector/index cost.
+ * For V2, we will use cell-level granularity.
+ */
 function chunkCsv(raw: string): Chunk[] {
   const records = parse(raw, { columns: true, skip_empty_lines: true });
   const headers = Object.keys(records[0] ?? {});

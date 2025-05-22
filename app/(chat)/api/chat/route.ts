@@ -37,6 +37,7 @@ import { after } from 'next/server';
 import type { Chat } from '@/lib/db/schema';
 import { differenceInSeconds } from 'date-fns';
 import { ChatSDKError } from '@/lib/errors';
+import { answerWithRAG } from '@/lib/ragService';
 
 export const maxDuration = 60;
 
@@ -113,18 +114,6 @@ export async function POST(request: Request) {
     }
 
     const previousMessages = await getMessagesByChatId({ id });
-    const fileEmbeddings = await getFileEmbeddingsByChatId({ chatId: id });
-
-    // Add file context to the system prompt if there are file embeddings
-    const fileContext =
-      fileEmbeddings.length > 0
-        ? `\n\nContext from uploaded files:\n${fileEmbeddings
-            .map(
-              (embedding) =>
-                `File: ${embedding.fileName}\nContent: ${embedding.content}\n`,
-            )
-            .join('\n')}`
-        : '';
 
     const messages = appendClientMessage({
       // @ts-expect-error: todo add type conversion from DBMessage[] to UIMessage[]
@@ -156,13 +145,18 @@ export async function POST(request: Request) {
 
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId: id });
+    const userText = message.parts[0]?.text ?? '';
+    const ragAnswer = await answerWithRAG({
+      chatId: id,
+      question: userText,
+    });
 
     const stream = createDataStream({
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
-          system:
-            systemPrompt({ selectedChatModel, requestHints }) + fileContext,
+          system: `${systemPrompt({ selectedChatModel, requestHints })}
+          \n\nContext from uploaded files:\n${ragAnswer}`,
           messages,
           maxSteps: 5,
           experimental_activeTools:
@@ -226,14 +220,13 @@ export async function POST(request: Request) {
             functionId: 'stream-text',
           },
         });
-
         result.consumeStream();
-
         result.mergeIntoDataStream(dataStream, {
           sendReasoning: true,
         });
       },
-      onError: () => {
+      onError: (e) => {
+        console.error(e);
         return 'Oops, an error occurred!';
       },
     });

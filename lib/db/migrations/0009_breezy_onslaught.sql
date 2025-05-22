@@ -1,0 +1,1 @@
+ALTER TABLE "FileEmbedding" ADD COLUMN "metadata" jsonb NOT NULL;

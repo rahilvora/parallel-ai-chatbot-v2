@@ -11,7 +11,7 @@ import {
   boolean,
   vector,
   integer,
-  index,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -184,6 +184,9 @@ export type Stream = InferSelectModel<typeof stream>;
  *
  *   This metadata lets us trace retrieved chunks back to their exact position
  *   in the original attachment, enabling inline highlights and precise citations.
+ *
+ * A `metadata` JSONB column holds structured context (e.g. chatId, fileName,
+ *   chunkIndex, rowIndex, colName), enabling flexible filtering and traceability.
  */
 export const fileEmbedding = pgTable('FileEmbedding', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
@@ -203,7 +206,7 @@ export const fileEmbedding = pgTable('FileEmbedding', {
 
   content: text('content').notNull(),
   embedding: vector('embedding', { dimensions: 1536 }).notNull(),
-
+  metadata: jsonb('metadata').notNull(),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
 });
 export type FileEmbedding = InferSelectModel<typeof fileEmbedding>;
