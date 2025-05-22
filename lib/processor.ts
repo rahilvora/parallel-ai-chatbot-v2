@@ -50,6 +50,13 @@ export async function processFile(opts: ProcessFileOptions) {
               colName: c.colName ?? null,
               content: c.text,
               embedding: data[j].embedding,
+              metadata: {
+                chatId,
+                fileName,
+                chunkIndex: c.chunkIndex,
+                rowIndex: c.rowIndex ?? null,
+                colName: c.colName ?? null,
+              },
               createdAt: now,
             }),
           ),

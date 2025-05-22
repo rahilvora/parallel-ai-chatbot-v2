@@ -548,6 +548,7 @@ export async function saveFileEmbedding({
   colName,
   content,
   embedding,
+  metadata,
   createdAt,
 }: {
   chatId: string;
@@ -559,6 +560,7 @@ export async function saveFileEmbedding({
   colName: string | null;
   content: string;
   embedding: number[];
+  metadata: Record<string, any>;
   createdAt: Date;
 }) {
   try {
@@ -572,6 +574,7 @@ export async function saveFileEmbedding({
       colName,
       content,
       embedding,
+      metadata,
       createdAt,
     });
   } catch (error) {

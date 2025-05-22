@@ -251,7 +251,7 @@ function PureMultimodalInput({
 
           {uploadQueue.map((filename) => (
             <PreviewAttachment
-              key={filename}
+              key={`upload-${filename}`}
               attachment={{
                 url: '',
                 name: filename,
