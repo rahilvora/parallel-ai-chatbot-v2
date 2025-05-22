@@ -1,28 +1,51 @@
-// lib/chunker.ts
 import { encode, decode } from 'gpt-tokenizer';
+import { parse } from 'csv-parse/sync';
 
-const MAX_TOKENS = 500;
-const OVERLAP = 50;
+/** Returned by chunkers and fed into the embedder */
+export interface Chunk {
+  text: string;
+  chunkIndex: number; // 0-based within the file
+  /** CSV-specific metadata (undefined for .txt) */
+  rowIndex?: number;
+  colName?: string;
+}
 
-export function chunkText(raw: string) {
-  // 1) split on double-newline paragraphs
+/* ----- TEXT / MARKDOWN ----- */
+const MAX_TOKENS = 300;
+const OVERLAP = 30;
+
+function chunkMarkdown(raw: string): Chunk[] {
   const paragraphs = raw.split(/\n\s*\n/);
+  const out: Chunk[] = [];
+  let chunkIdx = 0;
 
-  const allChunks: string[] = [];
-
-  for (const paragraph of paragraphs) {
-    const tokens = encode(paragraph);
-    if (tokens.length <= MAX_TOKENS) {
-      allChunks.push(paragraph);
+  for (const para of paragraphs) {
+    const toks = encode(para);
+    if (toks.length <= MAX_TOKENS) {
+      out.push({ text: para, chunkIndex: chunkIdx++ });
     } else {
-      // 2) sliding window on tokens
-      for (let i = 0; i < tokens.length; i += MAX_TOKENS - OVERLAP) {
-        const slice = tokens.slice(i, i + MAX_TOKENS);
-        allChunks.push(decode(slice));
-        if (i + MAX_TOKENS >= tokens.length) break;
+      for (let i = 0; i < toks.length; i += MAX_TOKENS - OVERLAP) {
+        const slice = toks.slice(i, i + MAX_TOKENS);
+        out.push({ text: decode(slice), chunkIndex: chunkIdx++ });
+        if (i + MAX_TOKENS >= toks.length) break;
       }
     }
   }
+  return out;
+}
 
-  return allChunks;
+/* ----- CSV  (row-level for v1) ----- */
+function chunkCsv(raw: string): Chunk[] {
+  const records = parse(raw, { columns: true, skip_empty_lines: true });
+  const headers = Object.keys(records[0] ?? {});
+  return records.map((row: any, idx: number) => ({
+    text: headers.map((h) => `${h}: ${row[h]}`).join('  '),
+    chunkIndex: 0, // single “chunk” per row
+    rowIndex: idx,
+  }));
+}
+
+/* Public API */
+export function chunkFile(raw: string, mimeType: string): Chunk[] {
+  return mimeType === 'text/csv' ? chunkCsv(raw) : chunkMarkdown(raw);
 }

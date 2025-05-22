@@ -1,70 +1,63 @@
 import OpenAI from 'openai';
 import pLimit from 'p-limit';
-import { chunkText } from './chunker';
+import { chunkFile, type Chunk } from './chunker';
 import { saveFileEmbedding } from './db/queries';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const BATCH_SIZE = 500;
-const CONCURRENCY = 5;
+
+const BATCH_SIZE = 500; // embed API supports big batches
+const CONCURRENCY = 5; // stay under rate limits
 
 export interface ProcessFileOptions {
   chatId: string;
   fileName: string;
-  fileType: string;
+  fileType: string; // 'text/plain' | 'text/csv'
   fileUrl: string;
   rawBuffer: ArrayBuffer;
 }
 
-export async function processFile({
-  chatId,
-  fileName,
-  fileType,
-  fileUrl,
-  rawBuffer,
-}: ProcessFileOptions) {
-  // Decode buffer into text
-  const text = new TextDecoder().decode(rawBuffer);
-  // Split text into semantic chunks
-  const chunks = chunkText(text);
+export async function processFile(opts: ProcessFileOptions) {
+  const { chatId, fileName, fileType, fileUrl, rawBuffer } = opts;
 
-  // Limit concurrency to avoid rate limits
+  /* 1️. decode & chunk */
+  const rawText = new TextDecoder().decode(rawBuffer);
+  const chunks = chunkFile(rawText, fileType);
+
+  /* 2️️ batch-embed */
   const limit = pLimit(CONCURRENCY);
   const tasks: Promise<void>[] = [];
 
-  // Process in batches to reduce API calls
   for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-    const batch = chunks.slice(i, i + BATCH_SIZE);
+    const batch: Chunk[] = chunks.slice(i, i + BATCH_SIZE);
     tasks.push(
       limit(async () => {
-        try {
-          // 1️⃣ Generate embeddings for this batch
-          const resp = await openai.embeddings.create({
-            model: 'text-embedding-3-small',
-            input: batch,
-          });
+        const { data } = await openai.embeddings.create({
+          model: 'text-embedding-3-small',
+          input: batch.map((c) => c.text),
+        });
 
-          // 2️⃣ Persist each chunk + embedding
-          const now = new Date();
-          for (let j = 0; j < batch.length; j++) {
-            await saveFileEmbedding({
+        /* 3️️ persist each row */
+        const now = new Date();
+        await Promise.all(
+          batch.map((c, j) =>
+            saveFileEmbedding({
               chatId,
               fileName,
               fileUrl,
               fileType,
-              content: batch[j],
-              embedding: resp.data[j].embedding,
+              chunkIndex: c.chunkIndex,
+              rowIndex: c.rowIndex ?? null,
+              colName: c.colName ?? null,
+              content: c.text,
+              embedding: data[j].embedding,
               createdAt: now,
-            });
-          }
-        } catch (error) {
-          console.error(`Error processing batch at index ${i}:`, error);
-          // Optionally, collect failures for retry
-        }
+            }),
+          ),
+        );
       }),
     );
   }
-  // Wait for all embedding tasks
-  await Promise.all(tasks);
 
+  await Promise.all(tasks);
   return { success: true, chunkCount: chunks.length };
 }
