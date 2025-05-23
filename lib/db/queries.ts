@@ -11,6 +11,7 @@ import {
   inArray,
   lt,
   type SQL,
+  sql,
 } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -598,6 +599,33 @@ export async function getFileEmbeddingsByChatId({
     throw new ChatSDKError(
       'bad_request:database',
       'Failed to get file embeddings by chat id',
+    );
+  }
+}
+
+export async function findSimilarEmbeddings({
+  chatId,
+  embedding,
+  limit = 5,
+}: {
+  chatId: string;
+  embedding: number[];
+  limit?: number;
+}) {
+  try {
+    // Convert embedding array to PostgreSQL vector format
+    const vectorStr = `[${embedding.join(',')}]`;
+
+    return await db
+      .select()
+      .from(fileEmbedding)
+      .where(eq(fileEmbedding.chatId, chatId))
+      .orderBy(sql`${fileEmbedding.embedding} <=> ${vectorStr}::vector`)
+      .limit(limit);
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to find similar embeddings',
     );
   }
 }

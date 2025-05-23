@@ -16,7 +16,7 @@ import {
   getStreamIdsByChatId,
   saveChat,
   saveMessages,
-  getFileEmbeddingsByChatId,
+  findSimilarEmbeddings,
 } from '@/lib/db/queries';
 import { generateUUID, getTrailingMessageId } from '@/lib/utils';
 import { generateTitleFromUserMessage } from '../../actions';
@@ -37,11 +37,17 @@ import { after } from 'next/server';
 import type { Chat } from '@/lib/db/schema';
 import { differenceInSeconds } from 'date-fns';
 import { ChatSDKError } from '@/lib/errors';
-import { answerWithRAG } from '@/lib/ragService';
+import { OpenAIEmbeddings } from '@langchain/openai';
 
 export const maxDuration = 60;
 
 let globalStreamContext: ResumableStreamContext | null = null;
+
+// Initialize embedding model
+const embeddings = new OpenAIEmbeddings({
+  modelName: 'text-embedding-3-small',
+  openAIApiKey: process.env.OPENAI_API_KEY,
+});
 
 function getStreamContext() {
   if (!globalStreamContext) {
@@ -116,8 +122,7 @@ export async function POST(request: Request) {
     const previousMessages = await getMessagesByChatId({ id });
 
     const messages = appendClientMessage({
-      // @ts-expect-error: todo add type conversion from DBMessage[] to UIMessage[]
-      messages: previousMessages,
+      messages: previousMessages as any,
       message,
     });
 
@@ -146,17 +151,27 @@ export async function POST(request: Request) {
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId: id });
     const userText = message.parts[0]?.text ?? '';
-    const ragAnswer = await answerWithRAG({
+
+    // Get embedding for the user's question
+    const questionEmbedding = await embeddings.embedQuery(userText);
+
+    // Find similar embeddings using cosine similarity
+    const similarEmbeddings = await findSimilarEmbeddings({
       chatId: id,
-      question: userText,
+      embedding: questionEmbedding,
     });
+
+    // Create context from relevant documents
+    const context = similarEmbeddings
+      .map((doc: any) => doc.content)
+      .join('\n\n');
 
     const stream = createDataStream({
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: `${systemPrompt({ selectedChatModel, requestHints })}
-          \n\nContext from uploaded files:\n${ragAnswer}`,
+          \n\nContext from uploaded files:\n${context}`,
           messages,
           maxSteps: 5,
           experimental_activeTools:
