@@ -629,3 +629,28 @@ export async function findSimilarEmbeddings({
     );
   }
 }
+
+export async function saveFileEmbeddings(
+  embeddings: Array<{
+    chatId: string;
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    chunkIndex: number;
+    rowIndex: number | null;
+    colName: string | null;
+    content: string;
+    embedding: number[];
+    metadata: Record<string, any>;
+    createdAt: Date;
+  }>,
+) {
+  try {
+    return await db.insert(fileEmbedding).values(embeddings);
+  } catch (error) {
+    throw new ChatSDKError(
+      'bad_request:database',
+      'Failed to save file embeddings',
+    );
+  }
+}
