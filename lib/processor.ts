@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import pLimit from 'p-limit';
 import { chunkFile, type Chunk } from './chunker';
-import { saveFileEmbedding } from './db/queries';
+import { saveFileEmbeddings } from './db/queries';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -36,31 +36,29 @@ export async function processFile(opts: ProcessFileOptions) {
           input: batch.map((c) => c.text),
         });
 
-        /* 3️️ persist each row */
+        /* 3️️ persist batch */
         const now = new Date();
-        await Promise.all(
-          batch.map((c, j) =>
-            saveFileEmbedding({
-              chatId,
-              fileName,
-              fileUrl,
-              fileType,
-              chunkIndex: c.chunkIndex,
-              rowIndex: c.rowIndex ?? null,
-              colName: c.colName ?? null,
-              content: c.text,
-              embedding: data[j].embedding,
-              metadata: {
-                chatId,
-                fileName,
-                chunkIndex: c.chunkIndex,
-                rowIndex: c.rowIndex ?? null,
-                colName: c.colName ?? null,
-              },
-              createdAt: now,
-            }),
-          ),
-        );
+        const embeddings = batch.map((c, j) => ({
+          chatId,
+          fileName,
+          fileUrl,
+          fileType,
+          chunkIndex: c.chunkIndex,
+          rowIndex: c.rowIndex ?? null,
+          colName: c.colName ?? null,
+          content: c.text,
+          embedding: data[j].embedding,
+          metadata: {
+            chatId,
+            fileName,
+            chunkIndex: c.chunkIndex,
+            rowIndex: c.rowIndex ?? null,
+            colName: c.colName ?? null,
+          },
+          createdAt: now,
+        }));
+
+        await saveFileEmbeddings(embeddings);
       }),
     );
   }
