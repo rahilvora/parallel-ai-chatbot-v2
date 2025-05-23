@@ -159,11 +159,12 @@ export async function POST(request: Request) {
     const similarEmbeddings = await findSimilarEmbeddings({
       chatId: id,
       embedding: questionEmbedding,
+      limit: 10,
     });
 
     // Create context from relevant documents
     const context = similarEmbeddings
-      .map((doc: any) => doc.content)
+      .map((doc: any) => `Content from ${doc.fileName}:\n${doc.content}`)
       .join('\n\n');
 
     const stream = createDataStream({
@@ -171,7 +172,22 @@ export async function POST(request: Request) {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: `${systemPrompt({ selectedChatModel, requestHints })}
-          \n\nContext from uploaded files:\n${context}`,
+            IMPORTANT: You are a helpful assistant that uses provided context to answer questions. Follow these rules strictly:
+
+            1. ALWAYS check the provided context first before answering
+            2. If the context contains relevant information to answer the question:
+               - Use that information in your response
+               - Cite the source (e.g. "According to [filename]...")
+               - Be specific and detailed
+            3. If the context doesn't contain relevant information:
+               - Explicitly state "I don't have enough information in the provided context to answer this question"
+               - Don't make up or guess information
+            4. Never ignore the context - it's your primary source of information
+
+            Context from uploaded files:
+            ${context}
+
+            Now, please answer the user's question based on the above context.`,
           messages,
           maxSteps: 5,
           experimental_activeTools:

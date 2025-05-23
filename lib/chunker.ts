@@ -46,12 +46,35 @@ function chunkCsv(raw: string): Chunk[] {
   const headers = Object.keys(records[0] ?? {});
   return records.map((row: any, idx: number) => ({
     text: headers.map((h) => `${h}: ${row[h]}`).join('  '),
-    chunkIndex: 0, // single “chunk” per row
+    chunkIndex: idx,
     rowIndex: idx,
   }));
 }
 
+/**
+ * Cell-level: precise, ideal for column-specific queries, higher vector/index cost.
+ */
+
+function chunkCsvCellLevel(raw: string): Chunk[] {
+  const records = parse(raw, { columns: true, skip_empty_lines: true });
+  const headers = Object.keys(records[0] ?? {});
+  let chunkIdx = 0;
+  const out: Chunk[] = [];
+
+  for (const [rowIndex, row] of records.entries()) {
+    for (const colName of headers) {
+      out.push({
+        text: `${colName}: ${row[colName]}`,
+        chunkIndex: chunkIdx++,
+        rowIndex,
+        colName,
+      });
+    }
+  }
+  return out;
+}
+
 /* Public API */
 export function chunkFile(raw: string, mimeType: string): Chunk[] {
-  return mimeType === 'text/csv' ? chunkCsv(raw) : chunkMarkdown(raw);
+  return mimeType === 'text/csv' ? chunkCsvCellLevel(raw) : chunkMarkdown(raw);
 }
